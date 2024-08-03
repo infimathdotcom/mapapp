@@ -1,0 +1,41 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Route Map</title>
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.7.1/dist/leaflet.css" />
+    <script src="https://unpkg.com/leaflet@1.7.1/dist/leaflet.js"></script>
+</head>
+<body>
+    <div id="map" style="height: 600px;"></div>
+    <script>
+        var map = L.map('map').setView([25.2437, 86.9842], 13);
+
+        L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+            maxZoom: 19,
+        }).addTo(map);
+
+        fetch('/route', {
+            method: 'POST'
+        })
+        .then(response => response.json())
+        .then(data => {
+            console.log(data.route); // Log the coordinates for debugging
+
+            // Add source and destination markers
+            var source = [data.route[0][0], data.route[0][1]];
+            var destination = [data.route[data.route.length - 1][0], data.route[data.route.length - 1][1]];
+
+            L.marker(source, {icon: L.icon({iconUrl: 'https://maps.google.com/mapfiles/ms/icons/green-dot.png'})}).addTo(map)
+                .bindPopup('Start').openPopup();
+            L.marker(destination, {icon: L.icon({iconUrl: 'https://maps.google.com/mapfiles/ms/icons/red-dot.png'})}).addTo(map)
+                .bindPopup('End').openPopup();
+
+            var latlngs = data.route.map(coord => [coord[0], coord[1]]); // Correct the order of lat and lng
+            var polylineRoute = L.polyline(latlngs, {color: 'blue'}).addTo(map);
+            map.fitBounds(polylineRoute.getBounds(), {padding: [50, 50]});
+        })
+        .catch(error => console.error('Error:', error));
+    </script>
+</body>
+</html>

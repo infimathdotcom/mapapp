@@ -15,25 +15,98 @@
             maxZoom: 19,
         }).addTo(map);
 
+        var personMarker;
+        var intersections = [];
+        var latlngs = [];
+
         fetch('/route', {
             method: 'POST'
         })
         .then(response => response.json())
         .then(data => {
-            console.log(data.route); // Log the coordinates for debugging
+            console.log(data.route);
 
             // Add source and destination markers
-            var source = [data.route[0][0], data.route[0][1]];
-            var destination = [data.route[data.route.length - 1][0], data.route[data.route.length - 1][1]];
+            var source = [data.route[0][1], data.route[0][0]];
+            var destination = [data.route[data.route.length - 1][1], data.route[data.route.length - 1][0]];
 
             L.marker(source, {icon: L.icon({iconUrl: 'https://maps.google.com/mapfiles/ms/icons/green-dot.png'})}).addTo(map)
                 .bindPopup('Start').openPopup();
             L.marker(destination, {icon: L.icon({iconUrl: 'https://maps.google.com/mapfiles/ms/icons/red-dot.png'})}).addTo(map)
                 .bindPopup('End').openPopup();
 
-            var latlngs = data.route.map(coord => [coord[0], coord[1]]); // Correct the order of lat and lng
+            latlngs = data.route.map(coord => [coord[1], coord[0]]);
             var polylineRoute = L.polyline(latlngs, {color: 'blue'}).addTo(map);
             map.fitBounds(polylineRoute.getBounds(), {padding: [50, 50]});
+
+            // Place the person marker at the start
+            personMarker = L.circleMarker(source, {
+                color: 'red',
+                radius: 5
+            }).addTo(map);
+
+            // Extract intersections and their maneuvers
+            intersections = data.intersections.map(intersection => {
+                return {
+                    location: [intersection.location[1], intersection.location[0]], // Convert [lng, lat] to [lat, lng]
+                    maneuver: intersection.maneuver
+                };
+            });
+
+            // Add intersection markers
+            intersections.forEach(function(intersection) {
+                if (intersection.maneuver) {
+                    L.circleMarker(intersection.location, {
+                        color: 'yellow',
+                        radius: 5
+                    }).addTo(map).bindPopup(`Turn: ${intersection.maneuver}`);
+                }
+            });
+
+            // Control movement
+            let currentIndex = 0;
+            let isStoppedAtIntersection = false;
+            let requiredManeuver = null;
+
+            function movePerson() {
+                if (currentIndex < latlngs.length - 1) {
+                    currentIndex++;
+                }
+
+                const currentLatLng = latlngs[currentIndex];
+                const intersection = intersections.find(intersection => 
+                    Math.abs(intersection.location[0] - currentLatLng[0]) < 0.0001 && 
+                    Math.abs(intersection.location[1] - currentLatLng[1]) < 0.0001
+                );
+
+                if (intersection && intersection.maneuver) {
+                    isStoppedAtIntersection = true;
+                    requiredManeuver = intersection.maneuver;
+                    alert(`At intersection: Turn ${intersection.maneuver}`);
+                }
+
+                personMarker.setLatLng(latlngs[currentIndex]);
+
+                if (!isStoppedAtIntersection) {
+                    setTimeout(movePerson, 500); // Continue moving automatically every 500ms
+                }
+            }
+
+            document.addEventListener('keydown', function(event) {
+                if (isStoppedAtIntersection) {
+                    if ((event.code === 'ArrowLeft' && requiredManeuver === 'left') ||
+                        (event.code === 'ArrowRight' && requiredManeuver === 'right')) {
+                        isStoppedAtIntersection = false;
+                        requiredManeuver = null;
+                        movePerson();
+                    } else {
+                        alert(`Wrong direction! You must turn ${requiredManeuver}.`);
+                    }
+                }
+            });
+
+            // Start automatic movement
+            movePerson();
         })
         .catch(error => console.error('Error:', error));
     </script>

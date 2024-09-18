@@ -1,3 +1,8 @@
 
 /app/__pycache__
 *.pyc
+
+# Start Generation Here
+docker-compose.yml
+# End Generation Here
+
